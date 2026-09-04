@@ -20,8 +20,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import quote_plus
 import shutil
 
-BOT_TOKEN ="8866129858:AAEnUCK7trJ0eKFiRVDeXsl876Dzq-V1WO8"
-MAIN_ADMIN_ID = 8183690849
+BOT_TOKEN ="8878742478:AAF-h5bIAg_OwXQQXc89ipw37Z4yRKKvxV4"
+MAIN_ADMIN_ID = 8037399518
 
 collected_codes = []
 
