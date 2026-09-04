@@ -1,0 +1,3 @@
+python-telegram-bot
+pip install python-telegram-bot
+pip install pycountry requests beautifulsoup4 pillow python-dotenv
