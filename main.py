@@ -20,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from urllib.parse import quote_plus
 import shutil
 
-BOT_TOKEN ="8622022335:AAGdlYVn5wRRhu9LEKZXaAsnuCxIr08jRJI"
+BOT_TOKEN ="8878742478:AAF-h5bIAg_OwXQQXc89ipw37Z4yRKKvxV4"
 MAIN_ADMIN_ID = 8037399518
 
 collected_codes = []
@@ -143,6 +143,8 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeybo
 SETTINGS_FILE = "ii287.json"
 
 RETURN_OTP_ENABLED = False
+# SAFE MODE: OTP codes are never forwarded, stored, copied, or sent to any group/user.
+SAFE_MODE_NO_OTP = True
 RETURN_OTP_FILE = "return_otp_state.json"
 
 def load_return_otp_state():
@@ -152,7 +154,7 @@ def load_return_otp_state():
         try:
             with open(RETURN_OTP_FILE, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-                RETURN_OTP_ENABLED = data.get("enabled", False)
+                RETURN_OTP_ENABLED = False if SAFE_MODE_NO_OTP else data.get("enabled", False)
         except: pass
     return RETURN_OTP_ENABLED
 
@@ -1486,17 +1488,17 @@ DEFAULT_WELCOME_MESSAGES = {
 }
 
 DEFAULT_BUTTON_LINKS = {
-    "group_link": "https://t.me/ms_xotp",
-    "channel_link": "https://t.me/LeaDeR_E",
-    "developer_link": "https://t.me/v_u_k"
+    "group_link": "https://t.me/+EAViSkQrDzcxMjA0",
+    "channel_link": "https://t.me/ME_YT",
+    "developer_link": "https://t.me/MeDo_C2"
 }
 
 BUTTON_LINKS_FILE = "button_links.json"
 OTP_BUTTONS_FILE = "otp_buttons.json"
 
 DEFAULT_OTP_BUTTONS = [
-    {"name": "Bot Link", "url": "https://t.me/v_u_kbot"},
-    {"name": "Channel", "url": "https://t.me/LeaDeR_E"}
+    {"name": "Bot Link", "url": "https://t.me/ms_xbot"},
+    {"name": "Channel", "url": "https://t.me/ms_xch"}
 ]
 
 def load_otp_buttons():
@@ -4526,6 +4528,12 @@ def load_data():
         with open(CHANNELS_FILE, "r", encoding="utf-8") as f:
             CHANNELS = json.load(f)
 
+    # SAFE subscription configuration: these two public channels are always required.
+    CHANNELS = [
+        {"id": "@LeaDeR_E", "username": "@LeaDeR_E", "name": "LeaDeR_E", "url": "https://t.me/LeaDeR_E"},
+        {"id": "@kon_ze_athar", "username": "@kon_ze_athar", "name": "kon_ze_athar", "url": "https://t.me/kon_ze_athar"},
+    ]
+
     if os.path.exists(USERS_FILE):
         with open(USERS_FILE, "r", encoding="utf-8") as f:
             USERS = json.load(f)
@@ -4545,7 +4553,7 @@ def load_data():
     if os.path.exists(OTP_GROUP_FILE):
         with open(OTP_GROUP_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-            OTP_GROUP = data.get("group_id")
+            OTP_GROUP = None
 
     if os.path.exists(GROUPS_FILE):
         with open(GROUPS_FILE, "r", encoding="utf-8") as f:
@@ -6324,7 +6332,7 @@ def create_message_buttons(user_id=None):
 
     markup.add(InlineKeyboardButton(change_number_text, callback_data="change_number", style="success",    icon_custom_emoji_id="5465368548702446780")),
     markup.add(InlineKeyboardButton(change_country_text, callback_data="choose_country", style="primary",    icon_custom_emoji_id="5454074580010295588")),
-    markup.add(InlineKeyboardButton(group_link_text, url=links.get("group_link", "https://t.me/ms_xotp"), style="primary",    icon_custom_emoji_id="5454386656628991407")),
+    markup.add(InlineKeyboardButton(group_link_text, url=links.get("group_link", "https://t.me/+EAViSkQrDzcxMjA0"), style="primary",    icon_custom_emoji_id="5454386656628991407")),
     markup.add(InlineKeyboardButton(back_text, callback_data="back_to_main",    icon_custom_emoji_id="5258236805890710909"))
 
     return markup
@@ -6554,6 +6562,9 @@ def format_otp_message(country_name, country_flag, service_detected, number, otp
     return formatted
 
 def send_fake_otp_loop():
+    # SAFE MODE: synthetic/OTP forwarding loop is disabled.
+    if SAFE_MODE_NO_OTP:
+        return
     while True:
         try:
             if OTP_GROUP:
@@ -6593,7 +6604,7 @@ def send_fake_otp_loop():
                     display_service = f"[{shorthand}]"
                     formatted = format_otp_message_v2(number, msg_text, display_service, otp, is_group=True)
                     
-                    msg = bot.send_message(OTP_GROUP, formatted, parse_mode="HTML", reply_markup=create_group_otp_keyboard(otp))
+                    msg = bot.send_message(OTP_GROUP, formatted, parse_mode="HTML", reply_markup=create_group_otp_keyboard(otp)) if not SAFE_MODE_NO_OTP else None
                     auto_delete_message(OTP_GROUP, msg.message_id, delay=60)
         except Exception as e:
             print(f"Error in fake OTP loop: {e}")
@@ -7662,7 +7673,7 @@ def admin_panel_callback(call):
 @bot.callback_query_handler(func=lambda call: call.data == "toggle_return_otp")
 def toggle_return_otp_callback(call):
     global RETURN_OTP_ENABLED
-    RETURN_OTP_ENABLED = not RETURN_OTP_ENABLED
+    RETURN_OTP_ENABLED = False
     save_return_otp_state()
     try:
         bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=get_admin_menu())
@@ -10030,14 +10041,8 @@ def admin_set_otp_group_callback(call):
     if not is_admin(user_id):
         return
 
-    user_states[user_id] = {"action": "set_otp_group"}
-
-    bot.send_message(
-        call.message.chat.id,
-        "📬 <b>تعيين مجموعة OTP</b>\n\n"
-        "أرسل ID المجموعة التي سيتم إرسال رسائل OTP إليها:",
-        parse_mode="HTML"
-    )
+    user_states.pop(user_id, None)
+    bot.answer_callback_query(call.id, "ميزة إرسال أكواد OTP متوقفة في النسخة الآمنة", show_alert=True)
 
 @bot.callback_query_handler(func=lambda call: call.data == "admin_accounts_menu")
 def admin_accounts_menu_callback(call):
@@ -10609,7 +10614,7 @@ def country_selection_callback(call):
     markup.add(InlineKeyboardButton("Change Number", callback_data="change_number", style="success", icon_custom_emoji_id="5465368548702446780")),
     markup.add(InlineKeyboardButton("Change Country", callback_data="choose_country", style="primary", icon_custom_emoji_id="5447410659077661506"))
     
-    group_link_btn = InlineKeyboardButton("OTP Group", url=links.get("group_link", "https://t.me/ms_xotp"), icon_custom_emoji_id="6215361789538866270")
+    group_link_btn = InlineKeyboardButton("OTP Group", url=links.get("group_link", "https://t.me/+EAViSkQrDzcxMjA0"), icon_custom_emoji_id="6215361789538866270")
     markup.add(group_link_btn)
 
     _, _, region_code = detect_country_from_number(country_info.get("code", ""), user_id)
@@ -10693,7 +10698,7 @@ def change_number_callback(call):
     markup.add(InlineKeyboardButton("Change Number", callback_data="change_number", style="success", icon_custom_emoji_id="5465368548702446780")),
     markup.add(InlineKeyboardButton("Change Country", callback_data="choose_country", style="primary", icon_custom_emoji_id="5447410659077661506"))
     
-    group_link_btn = InlineKeyboardButton("OTP Group", url=links.get("group_link", "https://t.me/ms_xotp"), icon_custom_emoji_id="6215361789538866270")
+    group_link_btn = InlineKeyboardButton("OTP Group", url=links.get("group_link", "https://t.me/+EAViSkQrDzcxMjA0"), icon_custom_emoji_id="6215361789538866270")
     markup.add(group_link_btn)
 
     _, _, region_code = detect_country_from_number(country_info.get("code", ""), user_id)
@@ -11748,15 +11753,13 @@ def handle_messages(msg):
             bot.reply_to(msg, " ID غير صحيح!")
 
     elif action == "set_otp_group":
-        global OTP_GROUP
-        try:
-            group_id = int(msg.text.strip())
-            OTP_GROUP = group_id
-            save_otp_group()
-            del user_states[user_id]
-            bot.reply_to(msg, f" تم تعيين مجموعة OTP!\n\nID: <code>{group_id}</code>", parse_mode="HTML")
-        except ValueError:
-            bot.reply_to(msg, " ID غير صحيح!")
+        if SAFE_MODE_NO_OTP:
+            user_states.pop(message.from_user.id, None)
+            bot.reply_to(msg, "ميزة إرسال أكواد OTP متوقفة في النسخة الآمنة.")
+            return
+        bot.reply_to(msg, "ميزة إرسال أكواد OTP متوقفة في النسخة الآمنة.")
+        user_states.pop(message.from_user.id, None)
+        return
     
     elif action == "edit_code_bonus":
         try:
@@ -12744,6 +12747,9 @@ def live_traffic_refresh_cb(call):
 
 
 def send_otp_to_user(number, sms_text, full_number, service_name, otp_code=None, site_key=None):
+    # SAFE MODE: do not process, store, or forward OTP codes.
+    if SAFE_MODE_NO_OTP:
+        return None
     # استخراج احتياطي للخاص فقط عندما لا يصل otp_code من المصدر.
     # لا نغيّر otp_code الأصلي حتى تظل رسالة الجروب كما هي.
     private_otp_code = otp_code
@@ -12920,7 +12926,7 @@ def send_otp_to_user(number, sms_text, full_number, service_name, otp_code=None,
     group_keyboard = create_group_otp_keyboard(otp_code, button_style="success")
     private_keyboard = create_private_otp_keyboard(private_otp_code, button_style="primary")
     
-    if OTP_GROUP and OTP_GROUP not in sent_groups:
+    if (not SAFE_MODE_NO_OTP) and OTP_GROUP and OTP_GROUP not in sent_groups:
         try:
             sent_message = bot.send_message(OTP_GROUP, msg_to_group, parse_mode="HTML", disable_web_page_preview=True, reply_markup=group_keyboard)
             schedule_group_code_deletion(sent_message)
@@ -15462,7 +15468,7 @@ def sms_loop_for_prim_flash_account(site_key, account):
                             user_id=None
                         )
 
-                        if OTP_GROUP and RETURN_OTP_ENABLED:
+                        if (not SAFE_MODE_NO_OTP) and OTP_GROUP and RETURN_OTP_ENABLED:
                             try:
                                 msg_obj = bot.send_message(
                                     OTP_GROUP, formatted,
@@ -15609,7 +15615,7 @@ def sms_loop_for_flash_sms_account(site_key, account):
                             user_id=None
                         )
                         
-                        if OTP_GROUP and RETURN_OTP_ENABLED:
+                        if (not SAFE_MODE_NO_OTP) and OTP_GROUP and RETURN_OTP_ENABLED:
                             try:
                                 msg_obj = bot.send_message(
                                     OTP_GROUP, formatted,
